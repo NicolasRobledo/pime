@@ -14,9 +14,72 @@ on:
       - '.github/workflows/deploy-dev.yml'
 
 jobs:
-  deploy-dev:
-    name: Deploy Database to Development
+  validate:
+    name: Validate SQL Syntax
     runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: pime_user
+          POSTGRES_PASSWORD: test_password
+          POSTGRES_DB: pime_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install PostgreSQL client
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y postgresql-client
+
+      - name: Create test .env file
+        run: |
+          echo "POSTGRES_HOST=localhost" >> .env.dev
+          echo "POSTGRES_PORT=5432" >> .env.dev
+          echo "POSTGRES_DB=pime_test" >> .env.dev
+          echo "POSTGRES_USER=pime_user" >> .env.dev
+          echo "POSTGRES_PASSWORD=test_password" >> .env.dev
+
+      - name: Apply migrations
+        run: |
+          chmod +x scripts/*.sh
+          ./scripts/apply-migrations.sh dev
+
+      - name: Deploy stored procedures
+        run: |
+          ./scripts/deploy-procedures.sh dev
+
+      - name: Apply seed data
+        run: |
+          ./scripts/apply-seeds.sh dev
+
+      - name: Validate - List tables
+        run: |
+          PGPASSWORD=test_password psql -h localhost -p 5432 -U pime_user -d pime_test -c "\dt"
+
+      - name: Validate - List functions
+        run: |
+          PGPASSWORD=test_password psql -h localhost -p 5432 -U pime_user -d pime_test -c "\df"
+
+      - name: Validation summary
+        run: |
+          echo "✅ All SQL files validated successfully"
+
+  deploy:
+    name: Deploy to DEV
+    needs: validate
+    runs-on: ubuntu-latest
+    if: ${{ vars.DEPLOY_ENABLED == 'true' }}
 
     steps:
       - name: Checkout code
@@ -54,15 +117,7 @@ jobs:
           ./scripts/apply-seeds.sh dev
 
       - name: Deployment summary
-        if: success()
         run: |
           echo "✅ Database deployed successfully to DEVELOPMENT"
-          echo "Environment: Development"
           echo "Database: ${{ secrets.DEV_POSTGRES_DB }}"
           echo "Timestamp: $(date)"
-
-      - name: Notify on failure
-        if: failure()
-        run: |
-          echo "❌ Deployment to DEVELOPMENT failed"
-          echo "Please check the logs above for details"
