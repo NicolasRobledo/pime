@@ -1,0 +1,33 @@
+version: '3.8'
+
+services:
+  postgres-test:
+    image: postgres:16-alpine
+    container_name: pime-db-test
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-pime_test}
+      POSTGRES_USER: ${POSTGRES_USER:-pime_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-test_password_change_me}
+      POSTGRES_INITDB_ARGS: "--encoding=UTF8 --locale=es_AR.UTF-8"
+    ports:
+      - "${POSTGRES_PORT:-5433}:5432"
+    volumes:
+      - postgres_test_data:/var/lib/postgresql/data
+      - ./migrations:/docker-entrypoint-initdb.d/migrations:ro
+      - ./scripts:/scripts:ro
+    networks:
+      - pime-network-test
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-pime_user} -d ${POSTGRES_DB:-pime_test}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  postgres_test_data:
+    driver: local
+
+networks:
+  pime-network-test:
+    driver: bridge

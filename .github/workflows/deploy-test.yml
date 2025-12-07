@@ -1,0 +1,68 @@
+name: Deploy to Test
+
+on:
+  push:
+    branches:
+      - test
+    paths:
+      - 'migrations/**'
+      - 'stored_procedures/**'
+      - 'functions/**'
+      - 'triggers/**'
+      - 'seeds/test/**'
+      - 'scripts/**'
+      - '.github/workflows/deploy-test.yml'
+
+jobs:
+  deploy-test:
+    name: Deploy Database to Test
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install PostgreSQL client
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y postgresql-client
+
+      - name: Create .env file
+        run: |
+          echo "POSTGRES_HOST=${{ secrets.TEST_POSTGRES_HOST }}" >> .env.test
+          echo "POSTGRES_PORT=${{ secrets.TEST_POSTGRES_PORT }}" >> .env.test
+          echo "POSTGRES_DB=${{ secrets.TEST_POSTGRES_DB }}" >> .env.test
+          echo "POSTGRES_USER=${{ secrets.TEST_POSTGRES_USER }}" >> .env.test
+          echo "POSTGRES_PASSWORD=${{ secrets.TEST_POSTGRES_PASSWORD }}" >> .env.test
+
+      - name: Test database connection
+        run: |
+          export $(cat .env.test | grep -v '^#' | xargs)
+          PGPASSWORD=$POSTGRES_PASSWORD psql -h $POSTGRES_HOST -p $POSTGRES_PORT -U $POSTGRES_USER -d $POSTGRES_DB -c "SELECT version();"
+
+      - name: Apply migrations
+        run: |
+          chmod +x scripts/*.sh
+          ./scripts/apply-migrations.sh test
+
+      - name: Deploy stored procedures
+        run: |
+          ./scripts/deploy-procedures.sh test
+
+      - name: Apply seed data
+        run: |
+          ./scripts/apply-seeds.sh test
+
+      - name: Deployment summary
+        if: success()
+        run: |
+          echo "✅ Database deployed successfully to TEST"
+          echo "Environment: Test"
+          echo "Database: ${{ secrets.TEST_POSTGRES_DB }}"
+          echo "Timestamp: $(date)"
+
+      - name: Notify on failure
+        if: failure()
+        run: |
+          echo "❌ Deployment to TEST failed"
+          echo "Please check the logs above for details"

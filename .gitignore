@@ -1,0 +1,38 @@
+# Environment variables
+.env
+.env.*
+!.env.example
+
+# Backups
+*.sql.backup
+backup_*.sql
+*.dump
+
+# PostgreSQL
+*.log
+pg_log/
+postgresql.conf.backup
+
+# OS
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+*~
+
+# IDE
+.vscode/
+.idea/
+*.iml
+
+# Obsidian
+.obsidian/
+
+# Temporary files
+*.tmp
+*.temp
+tmp/
+temp/
+
+# Docker volumes
+postgres_*_data/

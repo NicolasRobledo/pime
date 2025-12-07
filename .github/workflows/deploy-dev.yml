@@ -1,0 +1,68 @@
+name: Deploy to Development
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'migrations/**'
+      - 'stored_procedures/**'
+      - 'functions/**'
+      - 'triggers/**'
+      - 'seeds/dev/**'
+      - 'scripts/**'
+      - '.github/workflows/deploy-dev.yml'
+
+jobs:
+  deploy-dev:
+    name: Deploy Database to Development
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install PostgreSQL client
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y postgresql-client
+
+      - name: Create .env file
+        run: |
+          echo "POSTGRES_HOST=${{ secrets.DEV_POSTGRES_HOST }}" >> .env.dev
+          echo "POSTGRES_PORT=${{ secrets.DEV_POSTGRES_PORT }}" >> .env.dev
+          echo "POSTGRES_DB=${{ secrets.DEV_POSTGRES_DB }}" >> .env.dev
+          echo "POSTGRES_USER=${{ secrets.DEV_POSTGRES_USER }}" >> .env.dev
+          echo "POSTGRES_PASSWORD=${{ secrets.DEV_POSTGRES_PASSWORD }}" >> .env.dev
+
+      - name: Test database connection
+        run: |
+          export $(cat .env.dev | grep -v '^#' | xargs)
+          PGPASSWORD=$POSTGRES_PASSWORD psql -h $POSTGRES_HOST -p $POSTGRES_PORT -U $POSTGRES_USER -d $POSTGRES_DB -c "SELECT version();"
+
+      - name: Apply migrations
+        run: |
+          chmod +x scripts/*.sh
+          ./scripts/apply-migrations.sh dev
+
+      - name: Deploy stored procedures
+        run: |
+          ./scripts/deploy-procedures.sh dev
+
+      - name: Apply seed data
+        run: |
+          ./scripts/apply-seeds.sh dev
+
+      - name: Deployment summary
+        if: success()
+        run: |
+          echo "✅ Database deployed successfully to DEVELOPMENT"
+          echo "Environment: Development"
+          echo "Database: ${{ secrets.DEV_POSTGRES_DB }}"
+          echo "Timestamp: $(date)"
+
+      - name: Notify on failure
+        if: failure()
+        run: |
+          echo "❌ Deployment to DEVELOPMENT failed"
+          echo "Please check the logs above for details"

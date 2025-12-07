@@ -1,0 +1,10 @@
+# Migrations Directory
+
+Coloca aquí los scripts de migración DDL (Data Definition Language).
+
+Nomenclatura: `001_descripcion_del_cambio.sql`
+
+Ejemplo:
+- 001_create_initial_schema.sql
+- 002_add_google_id_to_users.sql
+- 003_create_purchases_table.sql
